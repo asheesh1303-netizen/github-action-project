@@ -1,0 +1,82 @@
+name: Deploy Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select Environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  plan:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: env/${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: AWS Auth
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init
+        run: terraform init
+
+      - name: Plan
+        run: terraform plan -out=tfplan
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: env/${{ inputs.environment }}/tfplan
+
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+
+    environment: ${{ inputs.environment == 'prod' && 'production' || 'nonprod' }}
+
+    defaults:
+      run:
+        working-directory: env/${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: env/${{ inputs.environment }}
+
+      - name: AWS Auth
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init
+        run: terraform init
+
+      - name: Apply
+        run: terraform apply -auto-approve tfplan
