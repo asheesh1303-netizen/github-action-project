@@ -1,0 +1,6 @@
+region          = "ap-south-1"
+env             = "prod"
+ami             = "ami-0bdd88bd06d16ba03"
+instance_type   = "t2.micro"
+vpc_cidr        = "10.2.0.0/16"
+subnet_cidr     = "10.2.1.0/24"
